@@ -1,0 +1,5 @@
+emsdk includes already compiled zlib, light-md5(https://github.com/michelerenzullo/light-md5) and minizip-ng.
+I've made a little patch on embind.js in order to allow "optionals" arguments for options_setter function
+
+
+em++ xmp_webconverter.cpp -lz -lworkerfs.js --bind -s ALLOW_MEMORY_GROWTH=1 -std=c++2a -o xmp_webconverter.js -llightmd5 -lminizip -Os

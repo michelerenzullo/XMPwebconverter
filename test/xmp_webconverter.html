@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title>XMP converter</title>
+	<style>
+      .spinner {
+        height: 30px;
+        width: 30px;
+        margin: 0;
+        margin-top: 20px;
+        margin-left: 20px;
+        display: none;
+        vertical-align: top;
+
+        -webkit-animation: rotation .8s linear infinite;
+        -moz-animation: rotation .8s linear infinite;
+        -o-animation: rotation .8s linear infinite;
+        animation: rotation 0.8s linear infinite;
+
+        border-left: 5px solid rgb(235, 235, 235);
+        border-right: 5px solid rgb(235, 235, 235);
+        border-bottom: 5px solid rgb(235, 235, 235);
+        border-top: 5px solid rgb(120, 120, 120);
+        
+        border-radius: 100%;
+        background-color: rgb(189, 215, 46);
+      }
+      @-webkit-keyframes rotation {
+        from {-webkit-transform: rotate(0deg);}
+        to {-webkit-transform: rotate(360deg);}
+      }
+      @-moz-keyframes rotation {
+        from {-moz-transform: rotate(0deg);}
+        to {-moz-transform: rotate(360deg);}
+      }
+      @-o-keyframes rotation {
+        from {-o-transform: rotate(0deg);}
+        to {-o-transform: rotate(360deg);}
+      }
+      @keyframes rotation {
+        from {transform: rotate(0deg);}
+        to {transform: rotate(360deg);}
+      }
+	</style>
+    <script type='text/javascript'>
+     const myworker = new Worker("xmp_webconverter_worker.js");
+     var $ = id =>{ return document.getElementById( id );};
+ 
+     function help(){$("help").hidden=false;}
+	 
+	 function execute(){
+	  var files = $('input_file').files;
+      if (files.length == 0) return;
+	  $("spinner").style.display = "inline-block";
+	  var arguments = {
+	   title: $("title").value,
+	   size: $("size").value|0,
+	   input:"to_convert/",
+	   output:"converted/",
+	   min: $("min").value|0,
+	   max: $("max").value|0,
+	   amount: $("amount").value|0,
+	   gamut: $("gamut").value,
+	   group: $("group").value,
+	   primaries: $("primaries").value,
+	   strength: $("strength").value
+	  };
+	  myworker.postMessage([["to_convert/","converted/"],files,arguments]);
+	  
+	  myworker.onmessage = e =>{
+	   save(e.data[0],e.data[1]);
+	   $("spinner").style.display = "none";
+	   $("input_file").value = '';
+	  }
+     }
+     function save(filename, blob) {
+      if(window.navigator.msSaveOrOpenBlob) window.navigator.msSaveBlob(blob, filename);
+      else{
+       var elem = window.document.createElement('a');
+       elem.href = window.URL.createObjectURL(blob);
+       elem.download = filename;        
+       document.body.appendChild(elem);
+       elem.click();        
+       document.body.removeChild(elem);
+      }
+	 }
+    </script>
+  </head>
+  <body>
+  <h3>XMPconverter online - Convert&nbsp;XMP&nbsp;to&nbsp;CUBE&nbsp;and&nbsp;vice&nbsp;versa,&nbsp;written&nbsp;by&nbsp;Michele&nbsp;Renzullo.</h3>
+  <br>
+  <input type="file" id="input_file" accept=".xmp,.cube" multiple />
+  <br><br>
+  <label for="arguments">OPTIONS FOR ENCODING</label><br>
+  <label for="arguments">title: </label>
+  <input type="text" id="title" name="title"><br>
+  <label for="arguments">group: </label>
+  <input type="text" id="group" name="group"><br>
+  <label for="arguments">re-size: </label>
+  <input id="size" type="number" min="2" max="32"><br>
+  <label for="arguments">min: </label>
+  <input id="min" type="number" min="0" max="100" value="0"><br>
+  <label for="arguments">max: </label>
+  <input id="max" type="number" min="100" max="200" value="200"><br>
+  <label for="arguments">amount: </label>
+  <input id="amount" type="number" min="0" max="200" value="100"><br>
+  <label for="arguments">primaries: </label>
+  <select id="primaries" name="primaries">
+    <option value="sRGB">sRGB</option>
+    <option value="Adobe">Adobe</option>
+    <option value="ProPhoto">ProPhoto</option>
+	<option value="P3">P3</option>
+	<option value="Rec2020">Rec2020</option>
+  </select><br>
+  <label for="arguments">gamut: </label>
+  <select id="gamut" name="gamut">
+    <option value="clip">clip</option>
+    <option value="extend">extend</option>
+  </select><br>
+  <label for="arguments">strength: </label>
+  <select id="strength" name="strength">
+    <option value="low">low</option>
+    <option value="medium">medium</option>
+    <option value="high">high</option>
+  </select><br><br>
+  <input type="button" onClick="execute()" value="convert" /> <input type="button" onClick="help()" value="help" /><br><br>
+  <div class="spinner" id='spinner'></div>
+  <div>
+  Features:<br>
+  - Batch convert (zip output)<br>
+  - Worker Thread<br>
+  - Very light, few libs zlib, minizip-ng, custom lib light-md5<br>
+  - Automatic resize when Cube LUT are >32<br>
+  - 100% same alghorithms of Camera Raw<br>
+  - Automatic mode: check if entries are xmp or cube<br>
+  - Manual mode: encode/decode functions available<br>
+  </div>
+  <br><div id="help" hidden>optional arguments for encoding to xmp:<br />&nbsp;&nbsp;&nbsp;&nbsp;size&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; size aka number of samples: &lt;=32<br />&nbsp;&nbsp;&nbsp;&nbsp;min&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp; min amount: from 0(default) to 100<br />&nbsp;&nbsp;&nbsp;&nbsp;max&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; max amount: from 100 to 200(default)<br />&nbsp;&nbsp;&nbsp;&nbsp;amount&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; amount: from 1 to 200<br />&nbsp;&nbsp;&nbsp;&nbsp;gamut&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; clip(default) or extend<br />&nbsp;&nbsp;&nbsp;&nbsp;primaries&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sRGB(default), Adobe, ProPhoto, P3, Rec2020<br />&nbsp;&nbsp;&nbsp;&nbsp;strength&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; tone map strength: low(default), medium, high<br />&nbsp;&nbsp;&nbsp;&nbsp;title&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; title of output<br />&nbsp;&nbsp;&nbsp;&nbsp;group&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; group title of output</div>
+  
+  </body>
+</html>
