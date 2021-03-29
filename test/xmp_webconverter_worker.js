@@ -1,10 +1,14 @@
 onmessage = (e)=> {
 	const folders = e.data[0];
     const f = e.data[1];
-	const arguments = e.data[2];
+	const arguments = e.data[2]; 
 	
-    try{FS.mkdir(folders[0]);}
-	catch{}
+ /* if (!Object.keys(FS.open('/','r').node.contents).includes(folders[0].endsWith("/") ? folders[0].slice(0,-1) : folders[0]))
+	 FS.mkdir(folders[0]);*/
+	 
+	try{FS.mkdir(folders[0]);}
+	catch{} 
+	
 	FS.mount(WORKERFS, { files: f }, folders[0]);
 
     Module.options(arguments);

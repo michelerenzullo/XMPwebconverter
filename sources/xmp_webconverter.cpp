@@ -126,10 +126,10 @@ void read_directory(const string& name, std::vector<string>& v) {
 	while ((dp = readdir(dirp)) != NULL) {
 		char* check_extension;
 		if (check_extension = strrchr(dp->d_name, '.')) {
-			for (uint32 i = 0; i < strlen(check_extension); ++i)
-				check_extension[i] = tolower(check_extension[i]);
+			string filename = dp->d_name;
+			for (uint32 i = 0; i < strlen(check_extension); ++i) check_extension[i] = tolower(check_extension[i]);
 			if (check_extension != NULL && (strcmp(check_extension, ".cube") == 0 xor strcmp(check_extension, ".xmp") == 0))
-				v.push_back(name + "/" + string(dp->d_name));
+				v.push_back(name + "/" + filename);
 		}
 	}
 	closedir(dirp);
@@ -195,7 +195,7 @@ void encode(string path, string outFileName) {
 	//printf("- test encoding back -\nTITLE: %s\nSIZE: %d\n",title.c_str(),input_size);
 	double* samples_1 = new double[input_size * input_size * input_size * 3];
 	char* points = nullptr;
-	for (const char* s = text->c_str(); *s; ++s) if (*s == '\n' && *++s <= '9' && *s >= '0') { points = strdup(s); delete text;  break; }
+	for (const char* s = text->c_str(); *s;) if (*s++ == '\n' && *s <= '9' && *s >= '0') { points = strdup(s); delete text;  break; }
 	for (int32 idx = 0; idx < input_size * input_size * input_size * 3;) samples_1[idx++] = strtod(points++, &points);
 
 	uint32 size = (input_size > options.size) ? options.size : input_size;
