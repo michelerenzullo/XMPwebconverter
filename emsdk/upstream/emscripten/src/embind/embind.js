@@ -499,6 +499,11 @@ var LibraryEmbind = {
         case 2: return signed ?
             function readS32FromPointer(pointer) { return HEAP32[pointer >> 2]; } :
             function readU32FromPointer(pointer) { return HEAPU32[pointer >> 2]; };
+#if WASM_BIGINT
+        case 3: return signed ?
+            function readS64FromPointer(pointer) { return HEAP64[pointer >> 3]; } :
+            function readU64FromPointer(pointer) { return HEAPU64[pointer >> 3]; };
+#endif
         default:
             throw new TypeError("Unknown integer type: " + name);
     }
@@ -562,7 +567,7 @@ var LibraryEmbind = {
         };
     }
 
-    var isUnsignedType = (name.indexOf('unsigned') != -1);
+    var isUnsignedType = (name.includes('unsigned'));
 
     registerType(primitiveType, {
         name: name,
@@ -584,6 +589,45 @@ var LibraryEmbind = {
     });
   },
 
+#if WASM_BIGINT
+  _embind_register_bigint__deps: [
+    'embind_repr', '$readLatin1String', '$registerType', '$integerReadValueFromPointer'],
+  _embind_register_bigint: function(primitiveType, name, size, minRange, maxRange) {
+    name = readLatin1String(name);
+
+    var shift = getShiftFromSize(size);
+
+    var isUnsignedType = (name.indexOf('u') != -1);
+
+    // maxRange comes through as -1 for uint64_t (see issue 13902). Work around that temporarily
+    if (isUnsignedType) {
+      // Use string because acorn does recognize bigint literals
+      maxRange = (BigInt(1) << BigInt(64)) - BigInt(1);
+    }
+
+    registerType(primitiveType, {
+        name: name,
+        'fromWireType': function (value) {
+          return value;
+        },
+        'toWireType': function (destructors, value) {
+          if (typeof value !== "bigint") {
+            throw new TypeError('Cannot convert "' + _embind_repr(value) + '" to ' + this.name);
+          }
+          if (value < minRange || value > maxRange) {
+            throw new TypeError('Passing a number "' + _embind_repr(value) + '" from JS side to C/C++ side to an argument of type "' + name + '", which is outside the valid range [' + minRange + ', ' + maxRange + ']!');
+          }
+          return value;
+        },
+        'argPackAdvance': 8,
+        'readValueFromPointer': integerReadValueFromPointer(name, shift, !isUnsignedType),
+        destructorFunction: null, // This type does not need a destructor
+    });
+  },
+#else
+  _embind_register_bigint__deps: [],
+  _embind_register_bigint: function(primitiveType, name, size, minRange, maxRange) {},
+#endif
 
   _embind_register_float__deps: [
     'embind_repr', '$floatReadValueFromPointer', '$getShiftFromSize',
@@ -923,7 +967,7 @@ var LibraryEmbind = {
     // TODO: Remove this completely once all function invokers are being dynamically generated.
     var needsDestructorStack = false;
 
-    for(var i = 1; i < argTypes.length; ++i) { // Skip return value at index 0 - it's not deleted here.
+    for (var i = 1; i < argTypes.length; ++i) { // Skip return value at index 0 - it's not deleted here.
         if (argTypes[i] !== null && argTypes[i].destructorFunction === undefined) { // The type does not define a destructor function - must use dynamic stack
             needsDestructorStack = true;
             break;
@@ -983,7 +1027,7 @@ var LibraryEmbind = {
 #else
     var argsList = "";
     var argsListWired = "";
-    for(var i = 0; i < argCount - 2; ++i) {
+    for (var i = 0; i < argCount - 2; ++i) {
         argsList += (i!==0?", ":"")+"arg"+i;
         argsListWired += (i!==0?", ":"")+"arg"+i+"Wired";
     }
@@ -1016,7 +1060,7 @@ var LibraryEmbind = {
         invokerFnBody += "var thisWired = classParam.toWireType("+dtorStack+", this);\n";
     }
 
-    for(var i = 0; i < argCount - 2; ++i) {
+    for (var i = 0; i < argCount - 2; ++i) {
         invokerFnBody += "var arg"+i+"Wired = argType"+i+".toWireType("+dtorStack+", arg"+i+"); // "+argTypes[i+2].name+"\n";
         args1.push("argType"+i);
         args2.push(argTypes[i+2]);
@@ -1032,7 +1076,7 @@ var LibraryEmbind = {
     if (needsDestructorStack) {
         invokerFnBody += "runDestructors(destructors);\n";
     } else {
-        for(var i = isClassMethodFunc?1:2; i < argTypes.length; ++i) { // Skip return value at index 0 - it's not deleted here. Also skip class type if not a method.
+        for (var i = isClassMethodFunc?1:2; i < argTypes.length; ++i) { // Skip return value at index 0 - it's not deleted here. Also skip class type if not a method.
             var paramName = (i === 1 ? "thisWired" : ("arg"+(i - 2)+"Wired"));
             if (argTypes[i].destructorFunction !== null) {
                 invokerFnBody += paramName+"_dtor("+paramName+"); // "+argTypes[i].name+"\n";
@@ -1075,7 +1119,7 @@ var LibraryEmbind = {
       return getDynCaller(signature, rawFunction);
 #else
 #if !WASM_BIGINT
-      if (signature.indexOf('j') != -1) {
+      if (signature.includes('j')) {
         return getDynCaller(signature, rawFunction);
       }
 #endif
@@ -1312,19 +1356,17 @@ var LibraryEmbind = {
             'toWireType': function(destructors, o) {
                 // todo: Here we have an opportunity for -O3 level "unsafe" optimizations:
                 // assume all fields are present without checking.
-              /*for (var fieldName in fields) {
+                /*
+                for (var fieldName in fields) {
                     if (!(fieldName in o)) {
                         throw new TypeError('Missing field:  "' + fieldName + '"');
                     }
-                }
-                var ptr = rawConstructor();
-                for (fieldName in fields) {
-                    fields[fieldName].write(ptr, o[fieldName]);*/        //optional arguments Michele
+                }*/
                 var ptr = rawConstructor();
                 for (fieldName in fields) {
                     if (fieldName in o) {
                         fields[fieldName].write(ptr, o[fieldName]);
-                    }
+                    }   
                 }
                 if (destructors !== null) {
                     destructors.push(rawDestructor, ptr);
@@ -2108,6 +2150,10 @@ var LibraryEmbind = {
         classType = classType[0];
         var humanName = classType.name + '.' + methodName;
 
+        if (methodName.startsWith("@@")) {
+            methodName = Symbol[methodName.substring(2)];
+        }
+
         if (isPureVirtual) {
             classType.registeredClass.pureVirtualFunctions.push(methodName);
         }
@@ -2244,6 +2290,10 @@ var LibraryEmbind = {
 
         function unboundTypesHandler() {
             throwUnboundTypeError('Cannot call ' + humanName + ' due to unbound types', rawArgTypes);
+        }
+
+        if (methodName.startsWith("@@")) {
+            methodName = Symbol[methodName.substring(2)];
         }
 
         var proto = classType.registeredClass.constructor;
