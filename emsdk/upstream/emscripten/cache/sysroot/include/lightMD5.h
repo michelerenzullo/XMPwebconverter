@@ -1,6 +1,9 @@
 #ifndef LIGHTMD5_H
 #define LIGHTMD5_H
 #include <string>
+#if !defined(_WIN32) || !defined(__WIN32__)
+#include <cstring>
+#endif
 
 std::string md5_process(uint8_t *, size_t);
 
