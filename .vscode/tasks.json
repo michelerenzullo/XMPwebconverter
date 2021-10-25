@@ -1,0 +1,50 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "cppbuild",
+			"label": "demo",
+			"command": "em++",
+			"args": [
+				"sources/xmp_webconverter.cpp",
+				"-std=c++2a",
+				"-sALLOW_MEMORY_GROWTH=1",
+				"-lzlib",
+				"-lworkerfs.js",
+				"-llightmd5",
+				"-lminizip",
+				"--bind",
+				"-O3",
+				//"-sSAFE_HEAP=1",
+				//"-fsanitize=address",
+				//"-fsanitize=leak",
+				//"-fsanitize=undefined",
+				//"-gsource-map",
+				//"--source-map-base","http://localhost/",
+				//"-sWASM=0"
+				//"-sWARN_UNALIGNED=1",
+				//"-sMAXIMUM_MEMORY=4GB",
+				//"-sDEMANGLE_SUPPORT=1",
+				//"-sNO_DISABLE_EXCEPTION_CATCHING",
+				"-Wcast-align", "-Wover-aligned",
+				//"-Werror", 
+				"-Wall",
+				//"-sASSERTIONS=1",
+				//"-sPRECISE_F32=1",
+				"-o", "test/xmp_webconverter.js",
+				"&&", "COPY", "/Y", "\"${workspaceFolder}\\test\\xmp_webconverter.js\"", "\"C:/xampp/htdocs/\"",
+				"&&", "COPY", "/Y", "\"${workspaceFolder}\\test\\xmp_webconverter.wasm\"", "\"C:/xampp/htdocs/\"",
+				"&&", "COPY", "/Y", "\"${workspaceFolder}\\test\\xmp_webconverter_worker.js\"", "\"C:/xampp/htdocs/\"",
+				"&&", "COPY", "/Y", "\"${workspaceFolder}\\test\\xmp_webconverter.html\"", "\"C:/xampp/htdocs/\""
+			],
+			"options": {
+				"cwd": "${workspaceFolder}"
+			},
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+			"detail": "compilatore: em++"
+		}
+	]
+}
