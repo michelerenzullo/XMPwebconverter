@@ -1393,7 +1393,7 @@ var LibraryEmbind = {
                     }
                 }*/
                 var ptr = rawConstructor();
-                for (fieldName in fields) {
+                for (var fieldName in fields) {
 					if (fieldName in o) {
 						fields[fieldName].write(ptr, o[fieldName]);
 					}
