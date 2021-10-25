@@ -1,26 +1,28 @@
 onmessage = (e)=> {
-	const folders = e.data[0];
-    const f = e.data[1];
-	const arguments = e.data[2]; 
+    const files = e.data[0];
+	const args = e.data[1]; 
+	args["input"] = "to_convert/"
+	args["output"] = "converted/"
 	
- /* if (!Object.keys(FS.open('/','r').node.contents).includes(folders[0].endsWith("/") ? folders[0].slice(0,-1) : folders[0]))
-	 FS.mkdir(folders[0]);*/
+ /* if (!Object.keys(FS.open('/','r').node.contents).includes(args.input.endsWith("/") ? args.input.slice(0,-1) : args.input))
+	 FS.mkdir(args.input);*/
+
 	 
-	try{FS.mkdir(folders[0]);}
+	try{FS.mkdir(args.input);}
 	catch{} 
 	
-	FS.mount(WORKERFS, { files: f }, folders[0]);
+	FS.mount(WORKERFS, { files: files }, args.input);
 
-    Module.options(arguments);
+    Module.options(args);
 	
-	FS.unmount(folders[0]);
+	FS.unmount(args.input);
 
-	if(f.length==1){
+	if(files.length==1){
      postMessage([
-	  Object.keys(FS.open(folders[1],'r').node.contents)[0],
-	  new Blob([FS.readFile(folders[1] + Object.keys(FS.open(folders[1],'r').node.contents)[0])], {type: "octet/stream"})
+	  Object.keys(FS.open(args.output,'r').node.contents)[0],
+	  new Blob([FS.readFile(args.output + Object.keys(FS.open(args.output,'r').node.contents)[0])], {type: "octet/stream"})
 	 ]);
-	 FS.unlink(folders[1] + Object.keys(FS.open(folders[1],'r').node.contents)[0]);
+	 FS.unlink(args.output + Object.keys(FS.open(args.output,'r').node.contents)[0]);
 	}
 	else {
 	 postMessage(["converted_luts.zip",new Blob([FS.readFile("converted_luts.zip")], {type: "octet/stream"})]);
