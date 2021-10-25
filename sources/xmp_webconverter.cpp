@@ -125,7 +125,7 @@ void read_directory(const string& name, std::vector<string>& v) {
 	struct dirent* dp;
 	while ((dp = readdir(dirp)) != NULL) {
 		char* check_extension;
-		if (check_extension = strrchr(dp->d_name, '.')) {
+		if ((check_extension = strrchr(dp->d_name, '.'))) {
 			string filename = dp->d_name;
 			for (uint32 i = 0; i < strlen(check_extension); ++i) check_extension[i] = tolower(check_extension[i]);
 			if (check_extension != NULL && (strcmp(check_extension, ".cube") == 0 xor strcmp(check_extension, ".xmp") == 0))
@@ -187,8 +187,8 @@ void encode(string path, string outFileName) {
 	int32 found1; string title = "";
 	if (!options.title.empty()) title = options.title;
 	else if ((found1 = text->find("TITLE", 0)) != -1) {
-		if (found1 = text->find("\"", found1 + 5) + 1) title = text->substr(found1, text->find("\"", found1) - found1);
-		else if (found1 = text->find("'", found1 + 5) + 1) title = text->substr(found1, text->find("'", found1) - found1);
+		if ((found1 = text->find("\"", found1 + 5) + 1)) title = text->substr(found1, text->find("\"", found1) - found1);
+		else if ((found1 = text->find("'", found1 + 5) + 1)) title = text->substr(found1, text->find("'", found1) - found1);
 	}
 	else title = path.substr(path.find_last_of("/\\") + 1, path.find_last_of(".") - (path.find_last_of("/\\") + 1));
 	uint32 input_size = stoi(text->substr(text->find("_SIZE", 0) + 5, 3));
@@ -468,7 +468,7 @@ void decode(string path, string outFileName) {
 
 std::vector<string> split(string arguments, const string& delimiter) {
 	std::vector<string> output;
-	for (size_t prev_pos = 0, pos = 0; (pos = arguments.find(delimiter)) != string::npos; arguments.erase(0, pos + delimiter.length())) {
+	for (size_t pos = 0; (pos = arguments.find(delimiter)) != string::npos; arguments.erase(0, pos + delimiter.length())) {
 		output.push_back(arguments.substr(0, pos));
 	}
 	output.push_back(arguments);
