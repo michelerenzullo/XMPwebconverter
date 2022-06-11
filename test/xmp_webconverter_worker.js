@@ -7,7 +7,6 @@ onmessage = (e) => {
 	/* if (!Object.keys(FS.open('/','r').node.contents).includes(args.input.endsWith("/") ? args.input.slice(0,-1) : args.input))
 		FS.mkdir(args.input);*/
 
-
 	try { FS.mkdir(args.input); }
 	catch { }
 

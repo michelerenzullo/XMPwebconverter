@@ -4,17 +4,22 @@
             "name": "emscripten",
             "includePath": [
                 "${workspaceFolder}/**",
-                "${vcpkgRoot}/x64-windows/include",
-                "C:/Users/miki/emsdk/upstream/emscripten/cache/sysroot/include"
+                "C:\\Users\\miki\\emsdk\\upstream\\emscripten\\cache\\sysroot/include/SDL",
+                "C:\\Users\\miki\\emsdk\\upstream\\emscripten\\cache\\sysroot/include\\compat",
+                "C:\\Users\\miki\\emsdk\\upstream\\emscripten\\cache\\sysroot/include/c++/v1",
+                "C:\\Users\\miki\\emsdk\\upstream\\lib\\clang\\15.0.0\\include",
+                "C:\\Users\\miki\\emsdk\\upstream\\emscripten\\cache\\sysroot/include"
             ],
             "defines": [
+                "_DEBUG",
                 "UNICODE",
                 "_UNICODE"
             ],
+            "windowsSdkVersion": "10.0.19041.0",
             "compilerPath": "C:\\Users\\miki\\emsdk\\upstream\\bin\\clang++.exe",
             "cStandard": "c17",
             "cppStandard": "c++20",
-            "intelliSenseMode": "gcc-x86"
+            "intelliSenseMode": "clang-x86"
         }
     ],
     "version": 4
