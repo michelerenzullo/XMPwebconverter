@@ -1,4 +1,4 @@
-emsdk v3.1.13 includes already compiled zlib v1.2.12, light-md5(https://github.com/michelerenzullo/light-md5) and minizip-ng v3.0.6.
+emsdk v3.1.13 includes already compiled zlib v1.2.12.1, light-md5(https://github.com/michelerenzullo/light-md5) and minizip-ng v3.0.6.
 I've made a little patch on embind.js in order to allow "optionals" arguments for options_setter function, if you use a new version of emsdk please build again libs.
 
 
