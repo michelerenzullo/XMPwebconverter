@@ -16,17 +16,21 @@ onmessage = (e) => {
 
 	FS.unmount(args.input);
 
-	if (files.length == 1) {
-		postMessage([
-			Object.keys(FS.open(args.output, 'r').node.contents)[0],
-			new Blob([FS.readFile(args.output + Object.keys(FS.open(args.output, 'r').node.contents)[0])], { type: "octet/stream" })
-		]);
-		FS.unlink(args.output + Object.keys(FS.open(args.output, 'r').node.contents)[0]);
+	try {
+		const filename = Object.keys(FS.open(args.output, 'r').node.contents)[0];
+		if (filename) {
+			postMessage([
+				filename,
+				new Blob([FS.readFile(args.output + filename)], { type: "octet/stream" })
+			]);
+			FS.unlink(args.output + filename);
+		}
+		else {
+			postMessage(["converted_luts.zip", new Blob([FS.readFile("converted_luts.zip")], { type: "octet/stream" })]);
+			FS.unlink("converted_luts.zip");
+		}
 	}
-	else {
-		postMessage(["converted_luts.zip", new Blob([FS.readFile("converted_luts.zip")], { type: "octet/stream" })]);
-		FS.unlink("converted_luts.zip");
-	}
+	catch { postMessage(undefined); }
 
 }
 

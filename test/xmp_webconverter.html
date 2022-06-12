@@ -92,9 +92,11 @@
       myworker.postMessage([files, arguments]);
 
       myworker.onmessage = e => {
-        save(e.data[0], e.data[1]);
         $("spinner").hidden = true
         $("input_file").value = '';
+        if (e.data) {
+          save(e.data[0], e.data[1]);
+        }
       }
     }
     const save = (filename, blob) => {

@@ -175,7 +175,7 @@ string get_file_contents(string filename)
 	throw;
 }
 
-void encode(string path, string outFileName)
+bool encode(string path, string outFileName)
 {
 	string text = (get_file_contents(path));
 	size_t found1;
@@ -382,7 +382,7 @@ void encode(string path, string outFileName)
 			uint8 *dPtr_2 = new uint8[safeEncodedSize];
 			uint32 k = 0;
 
-			const uint32* sPtr_1_ = reinterpret_cast<const uint32*>(sPtr_1);
+			const uint32 *sPtr_1_ = reinterpret_cast<const uint32 *>(sPtr_1);
 			for (uint32 i = 0, x; compressedSize_1; ++i)
 			{
 				x = *(sPtr_1_ + i);
@@ -413,15 +413,17 @@ void encode(string path, string outFileName)
 			fclose(f_6);
 			delete[] dPtr_2;
 			// printf("\n%s %d\n%s %d\n","safeEncodedSize:",safeEncodedSize,"true EncodedSize:",k);
+			return 1;
 		}
 		else
 			printf("no data lut\n");
 	}
 	else
 		printf("not a CUBE file\n");
+	return 0;
 }
 
-void decode(string path, string outFileName)
+bool decode(string path, string outFileName)
 {
 	uint32 compressedSize = 0;
 	string block1 = (get_file_contents(path));
@@ -566,9 +568,11 @@ void decode(string path, string outFileName)
 		fclose(f_4);
 		delete[] nopValue;
 		delete[] block3;
+		return 1;
 	}
 	else
 		printf("not a valid xmp profile\n");
+	return 0;
 }
 
 std::vector<string> split(string arguments, const string &delimiter)
@@ -658,8 +662,9 @@ void options_setter(defaults args)
 						outFileName = inputFile.substr(inputFile.find_last_of("/\\") + 1, inputFile.find_last_of(".") - (inputFile.find_last_of("/\\") + 1)) + ".";
 						outFileName += (filecheck == ext[0]) ? ext[1] : ext[0];
 					}
-					(filecheck == ext[0]) ? decode(inputFile, outFileName) : encode(inputFile, outFileName);
-					zip_list.push_back(outFileName);
+					bool result = (filecheck == ext[0]) ? decode(inputFile, outFileName) : encode(inputFile, outFileName);
+					if (result)
+						zip_list.push_back(outFileName);
 				}
 			}
 		}
