@@ -210,8 +210,7 @@ bool encode(string path, string outFileName)
 		{
 			double *samples_1 = new double[input_size * input_size * input_size * 3];
 			for (int32 idx = 0; idx < input_size * input_size * input_size * 3;)
-				if (points++)
-					samples_1[idx++] = strtod(points, &points);
+				samples_1[idx++] = strtod(points++, &points);
 			free(points_address);
 
 			uint32 size = (input_size > options.size) ? options.size : input_size;
@@ -477,7 +476,7 @@ bool decode(string path, string outFileName)
 				break;
 			}
 		}
-		
+
 		uint32 current_idx = compressedSize;
 		// printf("phase: %d",phase);
 		switch (phase)
