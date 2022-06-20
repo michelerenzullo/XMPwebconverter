@@ -178,19 +178,19 @@ string get_file_contents(string filename)
 
 bool encode(string path, string outFileName)
 {
-	char title[100];
+	char title[100] = {0};
 	int32_t input_size;
 	double *samples_1 = NULL;
-	int32_t result = CUBEParser(path.c_str(), title, &input_size, &samples_1);
+	int32_t result = CUBEParser(path.data(), 1, title, &input_size, &samples_1);
 
 	switch (result)
 	{
 	case -1:
-		printf("Size error - not a CUBE file\n");
+		printf("Error - no data lut\n");
 		result = 0;
 		break;
 	case -2:
-		printf("Error - no data lut\n");
+		printf("Size error - not a CUBE file\n");
 		result = 0;
 		break;
 	case 0:

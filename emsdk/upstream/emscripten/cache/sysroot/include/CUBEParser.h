@@ -8,23 +8,26 @@
 
 
 /* Call CUBEParser passing as arguments:
-   - const char pointer to the path of the CUBE file
+   - const char pointer to the path or buffer of the CUBE file
+   - bool mode, 1 if the previous argument is a path to the file, 0 if is buffer
    - char array of size 100 for the title or NULL if isn't needed
    - int32_t value for size
    - double pointer to a NULL pointer for the data table
-   It returns:
-   -1 if isn't a CUBE file
-   -2 if there isn't the data table
-   -3 if the input file hasn't been found
-	0 if everything is OK
 
-	In the source code remember to free memory of data table after usage.
+   It returns:
+	0 if everything is OK
+   -1 if there isn't the data table
+   -2 if isn't a CUBE file
+   -3 if the input file hasn't been found
+
+	In the source code remember to free memory of data table after usage, if
+	buffer is passed as argument is free internally.
 
 	Written by Michele Renzullo
 */
 
-int32_t CUBEParser(const char* path, char* title, int32_t* size, double** data);
-char* get_file_contents_(const char* filename);
+int32_t CUBEParser(char*, int32_t, char*, int32_t*, double**);
+char* get_file_contents_(const char*);
 
 char* get_file_contents_(const char* filename) {
 	FILE* fp = fopen(filename, "rb");
@@ -69,9 +72,9 @@ size_t find_last_of(const char* path, const char* symbols) {
 }
 
 
-int32_t CUBEParser(const char* path, char* title, int32_t* size, double** data) {
+int32_t CUBEParser(char* file, int32_t mode, char* title, int32_t* size, double** data) {
 	int32_t result;
-	char* text_ = get_file_contents_(path);
+	char* text_ = (mode) ? get_file_contents_(file) : file;
 
 	//if file has been read correctly
 	if (text_) {
@@ -97,7 +100,7 @@ int32_t CUBEParser(const char* path, char* title, int32_t* size, double** data) 
 						else if (*(found_ + 6) == '\'') title_ = substr(found_ + 7, (size_t)strstr(found_ + 7, "'") - ((size_t)found_ + 7));
 
 					}
-					else title_ = substr(path + find_last_of(path, "/\\") + 1, find_last_of(path, ".") - (find_last_of(path, "/\\") + 1));
+					else if (mode) title_ = substr(file + find_last_of(file, "/\\") + 1, find_last_of(file, ".") - (find_last_of(file, "/\\") + 1));
 
 					//if title has been found and parsed correctly
 					if (title_) {
@@ -114,9 +117,9 @@ int32_t CUBEParser(const char* path, char* title, int32_t* size, double** data) 
 
 				result = 0;
 			}
-			else result = -2;
+			else result = -1;
 		}
-		else result = -1;
+		else result = -2;
 
 		free(text_);
 	}
