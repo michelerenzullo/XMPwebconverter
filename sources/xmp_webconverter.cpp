@@ -8,6 +8,7 @@
 #include <sys/stat.h>
 #include <dirent.h>
 #include <vector>
+#include <CUBEParser.h>
 #include <emscripten/bind.h>
 
 typedef std::string string;
@@ -177,249 +178,228 @@ string get_file_contents(string filename)
 
 bool encode(string path, string outFileName)
 {
-	string text = (get_file_contents(path));
-	size_t found1;
-	string title = "";
+	char title[100];
+	int32_t input_size;
+	double *samples_1 = NULL;
+	int32_t result = CUBEParser(path.c_str(), title, &input_size, &samples_1);
 
-	if (!options.title.empty())
-		title = options.title;
-	else if ((found1 = text.find("TITLE", 0)) != -1)
+	switch (result)
 	{
-		if ((found1 = text.find("\"", found1 + 5) + 1))
-			title = text.substr(found1, text.find("\"", found1) - found1);
-		else if ((found1 = text.find("'", found1 + 5) + 1))
-			title = text.substr(found1, text.find("'", found1) - found1);
-	}
-	else
-		title = path.substr(path.find_last_of("/\\") + 1, path.find_last_of(".") - (path.find_last_of("/\\") + 1));
+	case -1:
+		printf("Size error - not a CUBE file\n");
+		result = 0;
+		break;
+	case -2:
+		printf("Error - no data lut\n");
+		result = 0;
+		break;
+	case 0:
+		//printf("- test encoding back -\nTITLE: %s\nSIZE: %d\n", (options.title.empty()) ? title : options.title.c_str(), input_size);
 
-	if (((found1 = text.find("_SIZE", 0)) != -1))
-	{
-		int32 input_size = stoi(text.substr(found1 + 5, 3));
-		// printf("- test encoding back -\nTITLE: %s\nSIZE: %d\n",title.c_str(),input_size);
+		uint32 size = (input_size > options.size) ? options.size : input_size;
+		// if(input_size>32) printf("ACR unsupports LUT>32, resampling enabled\n");
+		uint16 *nopValue_1 = new uint16[size];
+		for (uint32 index = 0; index < size; index++)
+			nopValue_1[index] = (index * 0x0FFFF + (size >> 1)) / (size - 1);
+		uint32 padding = 16 + size * size * size * 3 * 2 + 28;
+		uint8 *samples_2 = new uint8[padding];
 
-		char *points = nullptr;
-		char *points_address = nullptr;
-		for (const char *s = text.c_str(); *s;)
-			if (*s++ == '\n' && *s <= '9' && *s >= '0')
-			{
-				points = points_address = strdup(s);
-				break;
-			}
-		if (points)
+		uint32 header[4] = {1, 1, 3, size};
+		memcpy(samples_2, header, 16);
+		uint32 colors = 0, gamma = 1; // default sRGB
+		if (options.primaries == "Adobe")
 		{
-			double *samples_1 = new double[input_size * input_size * input_size * 3];
-			for (int32 idx = 0; idx < input_size * input_size * input_size * 3;)
-				samples_1[idx++] = strtod(points++, &points);
-			free(points_address);
+			colors = 1;
+			gamma = 3;
+		}
+		else if (options.primaries == "ProPhoto")
+		{
+			colors = 2;
+			gamma = 2;
+		}
+		else if (options.primaries == "P3")
+		{
+			colors = 3;
+			gamma = 1;
+		}
+		else if (options.primaries == "Rec2020")
+		{
+			colors = 4;
+			gamma = 4;
+		}
 
-			uint32 size = (input_size > options.size) ? options.size : input_size;
-			// if(input_size>32) printf("ACR unsupports LUT>32, resampling enabled\n");
-			uint16 *nopValue_1 = new uint16[size];
-			for (uint32 index = 0; index < size; index++)
-				nopValue_1[index] = (index * 0x0FFFF + (size >> 1)) / (size - 1);
-			uint32 padding = 16 + size * size * size * 3 * 2 + 28;
-			uint8 *samples_2 = new uint8[padding];
+		uint32 gamut = (options.gamut == "extend");
 
-			uint32 header[4] = {1, 1, 3, size};
-			memcpy(samples_2, header, 16);
-			uint32 colors = 0, gamma = 1; // default sRGB
-			if (options.primaries == "Adobe")
-			{
-				colors = 1;
-				gamma = 3;
-			}
-			else if (options.primaries == "ProPhoto")
-			{
-				colors = 2;
-				gamma = 2;
-			}
-			else if (options.primaries == "P3")
-			{
-				colors = 3;
-				gamma = 1;
-			}
-			else if (options.primaries == "Rec2020")
-			{
-				colors = 4;
-				gamma = 4;
-			}
+		uint32 footer[3] = {colors, gamma, gamut};
+		memcpy(samples_2 + 16 + size * size * size * 3 * 2, footer, 12);
+		double range[2] = {options.min * 0.01, options.max * 0.01};
+		memcpy(samples_2 + 16 + size * size * size * 3 * 2 + 12, range, 16);
 
-			uint32 gamut = (options.gamut == "extend");
+		if (input_size != size)
+		{
+			uint16 *shrinked = new uint16[size * size * size * 3];
+			shrink(samples_1, shrinked, input_size, size);
+			free(samples_1);
 
-			uint32 footer[3] = {colors, gamma, gamut};
-			memcpy(samples_2 + 16 + size * size * size * 3 * 2, footer, 12);
-			double range[2] = {options.min * 0.01, options.max * 0.01};
-			memcpy(samples_2 + 16 + size * size * size * 3 * 2 + 12, range, 16);
-
-			if (input_size != size)
-			{
-				uint16 *shrinked = new uint16[size * size * size * 3];
-				shrink(samples_1, shrinked, input_size, size);
-				delete[] samples_1;
-
-				for (uint32 bIndex = 0, idx, j = 0; bIndex < size; ++bIndex)
-					for (uint32 gIndex = 0; gIndex < size; ++gIndex)
-						for (uint32 rIndex = 0; rIndex < size; ++rIndex, j += 3)
-						{
-							idx = 16 + (rIndex * size * size + gIndex * size + bIndex) * 3 * 2;
-
-							uint16 temp = shrinked[j] - nopValue_1[rIndex];
-							memcpy(samples_2 + idx, &temp, 2);
-
-							temp = shrinked[j + 1] - nopValue_1[gIndex];
-							memcpy(samples_2 + idx + 2, &temp, 2);
-
-							temp = shrinked[j + 2] - nopValue_1[bIndex];
-							memcpy(samples_2 + idx + 4, &temp, 2);
-						}
-				delete[] shrinked;
-			}
-			else
-			{
-				for (uint32 bIndex = 0, idx, j = 0; bIndex < size; ++bIndex)
-					for (uint32 gIndex = 0; gIndex < size; ++gIndex)
-						for (uint32 rIndex = 0; rIndex < size; ++rIndex, j += 3)
-						{
-							idx = 16 + (rIndex * size * size + gIndex * size + bIndex) * 3 * 2;
-
-							uint16 temp = (int_round(samples_1[j] * 65535)) - nopValue_1[rIndex];
-							memcpy(samples_2 + idx, &temp, 2);
-
-							temp = (int_round(samples_1[j + 1] * 65535)) - nopValue_1[gIndex];
-							memcpy(samples_2 + idx + 2, &temp, 2);
-
-							temp = (int_round(samples_1[j + 2] * 65535)) - nopValue_1[bIndex];
-							memcpy(samples_2 + idx + 4, &temp, 2);
-						}
-				delete[] samples_1;
-			}
-			delete[] nopValue_1;
-
-			// printf("tot: %d\n",padding);
-#ifdef DEBUG
-			FILE *f_5 = fopen("outputarray.txt", "wb");
-			for (uint32 i = 0, j = 0, k = 0; i < padding; ++i)
-			{
-				if (i >= 16 && i < padding - 28)
-				{
-					if (j % 6 == 0)
+			for (uint32 bIndex = 0, idx, j = 0; bIndex < size; ++bIndex)
+				for (uint32 gIndex = 0; gIndex < size; ++gIndex)
+					for (uint32 rIndex = 0; rIndex < size; ++rIndex, j += 3)
 					{
-						fputs(("\n"), f_5);
-						j = 0;
+						idx = 16 + (rIndex * size * size + gIndex * size + bIndex) * 3 * 2;
+
+						uint16 temp = shrinked[j] - nopValue_1[rIndex];
+						memcpy(samples_2 + idx, &temp, 2);
+
+						temp = shrinked[j + 1] - nopValue_1[gIndex];
+						memcpy(samples_2 + idx + 2, &temp, 2);
+
+						temp = shrinked[j + 2] - nopValue_1[bIndex];
+						memcpy(samples_2 + idx + 4, &temp, 2);
 					}
-					j++;
-				}
-				else if (i >= padding - 18)
-				{
-					if (j % 8 == 0)
-					{
-						fputs(("\n"), f_5);
-						j = 0;
-					}
-					j++;
-				}
-				else
-				{
-					if (k == 4)
-					{
-						fputs(("\n"), f_5);
-						k = 0;
-					}
-					k++;
-				}
-				fprintf(f_5, "%d ", samples_2[i]);
-			}
-			fclose(f_5);
-#endif
-
-			uint8 *block1_1 = samples_2;
-			uint32 uncompressedSize_1 = padding;
-			uint32 safeCompressedSize = (uncompressedSize_1 | uncompressedSize_1 >> 8) + 64;
-			// printf("\n%s %d \n%s %d\n","uncompressedSize_1:",uncompressedSize_1,"safeCompressedSize:",safeCompressedSize);
-
-			string MD5 = md5_process(block1_1, uncompressedSize_1);
-			// printf("MD5: %s\n", MD5.c_str());
-			string UUID = MD5 + std::to_string(time_t(time(NULL)));
-			UUID = md5_process((uint8 *)UUID.c_str(), UUID.length());
-			// printf("UUID(aka MD5 of MD5+TIME): %s\n",UUID.c_str());
-
-			uint8 *dPtr_1 = new uint8[safeCompressedSize + 4];
-			memcpy(dPtr_1, &uncompressedSize_1, 4);
-			uLongf dCount = safeCompressedSize;
-			int32 zResult_1 = compress2(dPtr_1 + 4, &dCount, block1_1, uncompressedSize_1, Z_DEFAULT_COMPRESSION);
-			// printf("%s %d\n","zResult_1:",zResult_1);
-			delete[] samples_2;
-			uint32 compressedSize_1 = (uint32)dCount + 4;
-#ifdef DEBUG
-			FILE *f_1 = fopen("outputencoded.txt", "wb");
-			for (uint32 i = 0; i < safeCompressedSize + 4; ++i)
-				fputs((std::to_string(dPtr_1[i]) + " ").c_str(), f_1);
-			fclose(f_1);
-#endif
-
-			// printf("%s %d\n","compressedSize_1:",compressedSize_1);
-			uLongf destLen_1 = uncompressedSize_1;
-			uint8 *block3_1 = new uint8[uncompressedSize_1];
-			int32 zResult_2 = uncompress(block3_1, &destLen_1, dPtr_1 + 4, compressedSize_1 - 4);
-			// printf("%s %d","zResult_2:",zResult_2);
-#ifdef DEBUG
-			FILE *f_2 = fopen("outputencoded_1.txt", "wb");
-			for (uint32 i = 0; i < uncompressedSize_1; ++i)
-				fputs((std::to_string(block3_1[i]) + " ").c_str(), f_2);
-			fclose(f_2);
-#endif
-			delete[] block3_1;
-
-			static const char *kEncodeTable = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.-:+=^!/*?`'|()[]{}@%$#";
-			uint32 safeEncodedSize = compressedSize_1 + (compressedSize_1 >> 2) + (compressedSize_1 >> 6) + 16;
-
-			uint8 *sPtr_1 = dPtr_1;
-			sPtr_1[compressedSize_1] = 0;
-			sPtr_1[compressedSize_1 + 1] = 0;
-			sPtr_1[compressedSize_1 + 2] = 0;
-			uint8 *dPtr_2 = new uint8[safeEncodedSize];
-			uint32 k = 0;
-
-			const uint32 *sPtr_1_ = reinterpret_cast<const uint32 *>(sPtr_1);
-			for (uint32 i = 0, x; compressedSize_1; ++i)
-			{
-				x = *(sPtr_1_ + i);
-				for (uint32 j = 0; j < 5; ++j, x /= 85)
-				{
-					dPtr_2[k++] = kEncodeTable[x % 85];
-					if (j > 0 && !--compressedSize_1)
-						break;
-				}
-			}
-			delete[] dPtr_1;
-
-			FILE *f_6 = fopen(outFileName.c_str(), "wb");
-			string assembled = xmp_container[0] + UUID + xmp_container[1] + options.strength + xmp_container[2] + MD5 + xmp_container[3] + MD5 + xmp_container[4];
-			fwrite(assembled.c_str(), 1, assembled.size(), f_6);
-			fwrite(dPtr_2, 1, k, f_6);
-			if (options.amount > 0 && options.amount <= 200 && options.amount != 100)
-			{
-				string val = std::to_string(options.amount * 0.01);
-				val.erase(val.find_last_not_of('0') + 1, string::npos).erase(val.find_last_not_of('.') + 1, string::npos);
-				assembled = "\"\n   crs:RGBTableAmount=\"" + val;
-			}
-			else
-				assembled = "";
-			string group = (options.group.empty()) ? "/>" : ">" + options.group + "</rdf:li>";
-			assembled += xmp_container[5] + title + xmp_container[6] + group + xmp_container[7];
-			fwrite(assembled.c_str(), 1, assembled.size(), f_6);
-			fclose(f_6);
-			delete[] dPtr_2;
-			// printf("\n%s %d\n%s %d\n","safeEncodedSize:",safeEncodedSize,"true EncodedSize:",k);
-			return 1;
+			delete[] shrinked;
 		}
 		else
-			printf("no data lut\n");
+		{
+			for (uint32 bIndex = 0, idx, j = 0; bIndex < size; ++bIndex)
+				for (uint32 gIndex = 0; gIndex < size; ++gIndex)
+					for (uint32 rIndex = 0; rIndex < size; ++rIndex, j += 3)
+					{
+						idx = 16 + (rIndex * size * size + gIndex * size + bIndex) * 3 * 2;
+
+						uint16 temp = (int_round(samples_1[j] * 65535)) - nopValue_1[rIndex];
+						memcpy(samples_2 + idx, &temp, 2);
+
+						temp = (int_round(samples_1[j + 1] * 65535)) - nopValue_1[gIndex];
+						memcpy(samples_2 + idx + 2, &temp, 2);
+
+						temp = (int_round(samples_1[j + 2] * 65535)) - nopValue_1[bIndex];
+						memcpy(samples_2 + idx + 4, &temp, 2);
+					}
+			free(samples_1);
+		}
+		delete[] nopValue_1;
+
+		// printf("tot: %d\n",padding);
+#ifdef DEBUG
+		FILE *f_5 = fopen("outputarray.txt", "wb");
+		for (uint32 i = 0, j = 0, k = 0; i < padding; ++i)
+		{
+			if (i >= 16 && i < padding - 28)
+			{
+				if (j % 6 == 0)
+				{
+					fputs(("\n"), f_5);
+					j = 0;
+				}
+				j++;
+			}
+			else if (i >= padding - 18)
+			{
+				if (j % 8 == 0)
+				{
+					fputs(("\n"), f_5);
+					j = 0;
+				}
+				j++;
+			}
+			else
+			{
+				if (k == 4)
+				{
+					fputs(("\n"), f_5);
+					k = 0;
+				}
+				k++;
+			}
+			fprintf(f_5, "%d ", samples_2[i]);
+		}
+		fclose(f_5);
+#endif
+
+		uint8 *block1_1 = samples_2;
+		uint32 uncompressedSize_1 = padding;
+		uint32 safeCompressedSize = (uncompressedSize_1 | uncompressedSize_1 >> 8) + 64;
+		// printf("\n%s %d \n%s %d\n","uncompressedSize_1:",uncompressedSize_1,"safeCompressedSize:",safeCompressedSize);
+
+		string MD5 = md5_process(block1_1, uncompressedSize_1);
+		// printf("MD5: %s\n", MD5.c_str());
+		string UUID = MD5 + std::to_string(time_t(time(NULL)));
+		UUID = md5_process((uint8 *)UUID.c_str(), UUID.length());
+		// printf("UUID(aka MD5 of MD5+TIME): %s\n",UUID.c_str());
+
+		uint8 *dPtr_1 = new uint8[safeCompressedSize + 4];
+		memcpy(dPtr_1, &uncompressedSize_1, 4);
+		uLongf dCount = safeCompressedSize;
+		int32 zResult_1 = compress2(dPtr_1 + 4, &dCount, block1_1, uncompressedSize_1, Z_DEFAULT_COMPRESSION);
+		// printf("%s %d\n","zResult_1:",zResult_1);
+		delete[] samples_2;
+		uint32 compressedSize_1 = (uint32)dCount + 4;
+#ifdef DEBUG
+		FILE *f_1 = fopen("outputencoded.txt", "wb");
+		for (uint32 i = 0; i < safeCompressedSize + 4; ++i)
+			fputs((std::to_string(dPtr_1[i]) + " ").c_str(), f_1);
+		fclose(f_1);
+#endif
+
+		// printf("%s %d\n","compressedSize_1:",compressedSize_1);
+		uLongf destLen_1 = uncompressedSize_1;
+		uint8 *block3_1 = new uint8[uncompressedSize_1];
+		int32 zResult_2 = uncompress(block3_1, &destLen_1, dPtr_1 + 4, compressedSize_1 - 4);
+		// printf("%s %d","zResult_2:",zResult_2);
+#ifdef DEBUG
+		FILE *f_2 = fopen("outputencoded_1.txt", "wb");
+		for (uint32 i = 0; i < uncompressedSize_1; ++i)
+			fputs((std::to_string(block3_1[i]) + " ").c_str(), f_2);
+		fclose(f_2);
+#endif
+		delete[] block3_1;
+
+		static const char *kEncodeTable = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.-:+=^!/*?`'|()[]{}@%$#";
+		uint32 safeEncodedSize = compressedSize_1 + (compressedSize_1 >> 2) + (compressedSize_1 >> 6) + 16;
+
+		uint8 *sPtr_1 = dPtr_1;
+		sPtr_1[compressedSize_1] = 0;
+		sPtr_1[compressedSize_1 + 1] = 0;
+		sPtr_1[compressedSize_1 + 2] = 0;
+		uint8 *dPtr_2 = new uint8[safeEncodedSize];
+		uint32 k = 0;
+
+		const uint32 *sPtr_1_ = reinterpret_cast<const uint32 *>(sPtr_1);
+		for (uint32 i = 0, x; compressedSize_1; ++i)
+		{
+			x = *(sPtr_1_ + i);
+			for (uint32 j = 0; j < 5; ++j, x /= 85)
+			{
+				dPtr_2[k++] = kEncodeTable[x % 85];
+				if (j > 0 && !--compressedSize_1)
+					break;
+			}
+		}
+		delete[] dPtr_1;
+
+		FILE *f_6 = fopen(outFileName.c_str(), "wb");
+		string assembled = xmp_container[0] + UUID + xmp_container[1] + options.strength + xmp_container[2] + MD5 + xmp_container[3] + MD5 + xmp_container[4];
+		fwrite(assembled.c_str(), 1, assembled.size(), f_6);
+		fwrite(dPtr_2, 1, k, f_6);
+		if (options.amount > 0 && options.amount <= 200 && options.amount != 100)
+		{
+			string val = std::to_string(options.amount * 0.01);
+			val.erase(val.find_last_not_of('0') + 1, string::npos).erase(val.find_last_not_of('.') + 1, string::npos);
+			assembled = "\"\n   crs:RGBTableAmount=\"" + val;
+		}
+		else
+			assembled = "";
+		string group = (options.group.empty()) ? "/>" : ">" + options.group + "</rdf:li>";
+		assembled += (options.title.empty()) ? xmp_container[5] + title + xmp_container[6] + group + xmp_container[7] : xmp_container[5] + options.title + xmp_container[6] + group + xmp_container[7];
+		fwrite(assembled.c_str(), 1, assembled.size(), f_6);
+		fclose(f_6);
+		delete[] dPtr_2;
+		// printf("\n%s %d\n%s %d\n","safeEncodedSize:",safeEncodedSize,"true EncodedSize:",k);
+		result = 1;
+		break;
 	}
-	else
-		printf("not a CUBE file\n");
-	return 0;
+
+	return result;
 }
 
 bool decode(string path, string outFileName)
