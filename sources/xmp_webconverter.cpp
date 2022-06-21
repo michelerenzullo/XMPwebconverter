@@ -194,7 +194,7 @@ bool encode(string path, string outFileName)
 		result = 0;
 		break;
 	case 0:
-		//printf("- test encoding back -\nTITLE: %s\nSIZE: %d\n", (options.title.empty()) ? title : options.title.c_str(), input_size);
+		// printf("- test encoding back -\nTITLE: %s\nSIZE: %d\n", (options.title.empty()) ? title : options.title.c_str(), input_size);
 
 		uint32 size = (input_size > options.size) ? options.size : input_size;
 		// if(input_size>32) printf("ACR unsupports LUT>32, resampling enabled\n");
@@ -345,7 +345,7 @@ bool encode(string path, string outFileName)
 		uLongf destLen_1 = uncompressedSize_1;
 		uint8 *block3_1 = new uint8[uncompressedSize_1];
 		int32 zResult_2 = uncompress(block3_1, &destLen_1, dPtr_1 + 4, compressedSize_1 - 4);
-		// printf("%s %d","zResult_2:",zResult_2);
+		// printf("%s %d\n","zResult_2:",zResult_2);
 #ifdef DEBUG
 		FILE *f_2 = fopen("outputencoded_1.txt", "wb");
 		for (uint32 i = 0; i < uncompressedSize_1; ++i)
@@ -378,23 +378,28 @@ bool encode(string path, string outFileName)
 		delete[] dPtr_1;
 
 		FILE *f_6 = fopen(outFileName.c_str(), "wb");
-		string assembled = xmp_container[0] + UUID + xmp_container[1] + options.strength + xmp_container[2] + MD5 + xmp_container[3] + MD5 + xmp_container[4];
-		fwrite(assembled.c_str(), 1, assembled.size(), f_6);
-		fwrite(dPtr_2, 1, k, f_6);
-		if (options.amount > 0 && options.amount <= 200 && options.amount != 100)
+		if (f_6)
 		{
-			string val = std::to_string(options.amount * 0.01);
-			val.erase(val.find_last_not_of('0') + 1, string::npos).erase(val.find_last_not_of('.') + 1, string::npos);
-			assembled = "\"\n   crs:RGBTableAmount=\"" + val;
+			string assembled = xmp_container[0] + UUID + xmp_container[1] + options.strength + xmp_container[2] + MD5 + xmp_container[3] + MD5 + xmp_container[4];
+			fwrite(assembled.c_str(), 1, assembled.size(), f_6);
+			fwrite(dPtr_2, 1, k, f_6);
+			if (options.amount > 0 && options.amount <= 200 && options.amount != 100)
+			{
+				string val = std::to_string(options.amount * 0.01);
+				val.erase(val.find_last_not_of('0') + 1, string::npos).erase(val.find_last_not_of('.') + 1, string::npos);
+				assembled = "\"\n   crs:RGBTableAmount=\"" + val;
+			}
+			else
+				assembled = "";
+			string group = (options.group.empty()) ? "/>" : ">" + options.group + "</rdf:li>";
+			assembled += (options.title.empty()) ? xmp_container[5] + title + xmp_container[6] + group + xmp_container[7] : xmp_container[5] + options.title + xmp_container[6] + group + xmp_container[7];
+			fwrite(assembled.c_str(), 1, assembled.size(), f_6);
+			fclose(f_6);
 		}
 		else
-			assembled = "";
-		string group = (options.group.empty()) ? "/>" : ">" + options.group + "</rdf:li>";
-		assembled += (options.title.empty()) ? xmp_container[5] + title + xmp_container[6] + group + xmp_container[7] : xmp_container[5] + options.title + xmp_container[6] + group + xmp_container[7];
-		fwrite(assembled.c_str(), 1, assembled.size(), f_6);
-		fclose(f_6);
+			printf("Error writing file\n");
 		delete[] dPtr_2;
-		// printf("\n%s %d\n%s %d\n","safeEncodedSize:",safeEncodedSize,"true EncodedSize:",k);
+		// printf("%s %d\n%s %d\n","safeEncodedSize:",safeEncodedSize,"true EncodedSize:",k);
 		result = 1;
 		break;
 	}
@@ -531,20 +536,25 @@ bool decode(string path, string outFileName)
 			nopValue[index] = (index * 0x0FFFF + (fDivisions >> 1)) / (fDivisions - 1);
 
 		FILE *f_4 = fopen(outFileName.c_str(), "wb");
-		fprintf(f_4, "TITLE \"%s\"\nDOMAIN_MIN 0 0 0\nDOMAIN_MAX 1 1 1\nLUT_3D_SIZE %d\n", title.c_str(), fDivisions);
+		if (f_4)
+		{
+			fprintf(f_4, "TITLE \"%s\"\nDOMAIN_MIN 0 0 0\nDOMAIN_MAX 1 1 1\nLUT_3D_SIZE %d\n", title.c_str(), fDivisions);
 
-		const uint16 *block3_ = reinterpret_cast<const uint16 *>(block3);
-		for (uint32 rIndex = 0, idx; rIndex < fDivisions; ++rIndex)
-			for (uint32 gIndex = 0; gIndex < fDivisions; ++gIndex)
-				for (uint32 bIndex = 0; bIndex < fDivisions; ++bIndex)
-				{
-					idx = 8 + (rIndex + gIndex * fDivisions + bIndex * fDivisions * fDivisions) * 3;
-					fprintf(f_4, "%.9f %.9f %.9f\n",
-							(uint16)(*(block3_ + idx + 0) + nopValue[bIndex]) / 65535.0f,
-							(uint16)(*(block3_ + idx + 1) + nopValue[gIndex]) / 65535.0f,
-							(uint16)(*(block3_ + idx + 2) + nopValue[rIndex]) / 65535.0f);
-				}
-		fclose(f_4);
+			const uint16 *block3_ = reinterpret_cast<const uint16 *>(block3);
+			for (uint32 rIndex = 0, idx; rIndex < fDivisions; ++rIndex)
+				for (uint32 gIndex = 0; gIndex < fDivisions; ++gIndex)
+					for (uint32 bIndex = 0; bIndex < fDivisions; ++bIndex)
+					{
+						idx = 8 + (rIndex + gIndex * fDivisions + bIndex * fDivisions * fDivisions) * 3;
+						fprintf(f_4, "%.9f %.9f %.9f\n",
+								(uint16)(*(block3_ + idx + 0) + nopValue[bIndex]) / 65535.0f,
+								(uint16)(*(block3_ + idx + 1) + nopValue[gIndex]) / 65535.0f,
+								(uint16)(*(block3_ + idx + 2) + nopValue[rIndex]) / 65535.0f);
+					}
+			fclose(f_4);
+		}
+		else
+			printf("Error writing file\n");
 		delete[] nopValue;
 		delete[] block3;
 		return 1;
@@ -599,9 +609,7 @@ void options_setter(defaults args)
 	{
 
 		if (!mkpath(options.outFileName))
-		{
 			printf("can't write here\n");
-		}
 		bool outputIsDir = false;
 		if (dirExists(options.outFileName))
 			outputIsDir = true;
@@ -612,7 +620,8 @@ void options_setter(defaults args)
 				options.title = "";
 			if (!options.outFileName.empty() && !outputIsDir)
 			{
-				mkpath(options.outFileName + "/");
+				if (!mkpath(options.outFileName + "/"))
+					printf("can't write output dir\n");
 				outputIsDir = true;
 			}
 		}

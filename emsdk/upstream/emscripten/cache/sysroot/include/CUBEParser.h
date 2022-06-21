@@ -26,7 +26,7 @@
 	Written by Michele Renzullo
 */
 
-int32_t CUBEParser(char*, int32_t, char*, int32_t*, double**);
+int32_t CUBEParser(char* const, int32_t, char*, int32_t*, double**);
 char* get_file_contents_(const char*);
 
 char* get_file_contents_(const char* filename) {
@@ -72,9 +72,9 @@ size_t find_last_of(const char* path, const char* symbols) {
 }
 
 
-int32_t CUBEParser(char* file, int32_t mode, char* title, int32_t* size, double** data) {
+int32_t CUBEParser(char* const file, int32_t mode, char* title, int32_t* size, double** data) {
 	int32_t result;
-	char* text_ = (mode) ? get_file_contents_(file) : file;
+	char* const text_ = (mode) ? get_file_contents_(file) : file;
 
 	//if file has been read correctly
 	if (text_) {
