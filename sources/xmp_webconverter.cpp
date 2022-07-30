@@ -21,7 +21,7 @@ string md5_process(uint8 *, size_t);
 
 int32 int_round(double n) { return n >= 0 ? (int32)(n + .5) : (int32)(n - .5); }
 
-void shrink(double *to_shrink, uint16 *shrinked, int size, int new_size)
+void shrink(double *to_shrink, uint16 *shrinked, int32 size, int32 new_size)
 {
 	/* fast and easy tetrahedral interpolation rounded for uint16,
 	source: https://www.nvidia.com/content/GTC/posters/2010/V01-Real-Time-Color-Space-Conversion-for-High-Resolution-Video.pdf
@@ -29,17 +29,17 @@ void shrink(double *to_shrink, uint16 *shrinked, int size, int new_size)
 	could be differ of (1/65535)*255 due to math of compiler, obv is so little that doesn't affect quality(or similarity with Lightroom) */
 
 	double ratio = (size - 1.0) / (new_size - 1.0);
-
+	const int32 size2 = size * size;
 	for (int32 i = 0, idx; i < new_size; ++i)
 		for (int32 j = 0; j < new_size; ++j)
 			for (int32 k = 0; k < new_size; ++k)
 			{
-				int lr = std::clamp((int)(i * ratio), 0, size - 1);
-				int lg = std::clamp((int)(j * ratio), 0, size - 1);
-				int lb = std::clamp((int)(k * ratio), 0, size - 1);
-				int ur = std::clamp(lr + 1, 0, size - 1);
-				int ug = std::clamp(lg + 1, 0, size - 1);
-				int ub = std::clamp(lb + 1, 0, size - 1);
+				int32 lr = std::clamp((int32)(i * ratio), 0, size - 1);
+				int32 lg = std::clamp((int32)(j * ratio), 0, size - 1);
+				int32 lb = std::clamp((int32)(k * ratio), 0, size - 1);
+				int32 ur = std::clamp(lr + 1, 0, size - 1);
+				int32 ug = std::clamp(lg + 1, 0, size - 1);
+				int32 ub = std::clamp(lb + 1, 0, size - 1);
 				double fR = (double)i * ratio - lr;
 				double fG = (double)j * ratio - lg;
 				double fB = (double)k * ratio - lb;
@@ -47,27 +47,27 @@ void shrink(double *to_shrink, uint16 *shrinked, int size, int new_size)
 				idx = (i * new_size * new_size + j * new_size + k) * 3;
 				if (fG >= fB && fB >= fR)
 					for (uint32 l = 0; l < 3; ++l)
-						shrinked[idx + l] = 0.5 + (float)((1 - fG) * (int_round((float)to_shrink[(lr * size * size + lg * size + lb) * 3 + l] * 65535)) + (fG - fB) * (int_round((float)to_shrink[(lr * size * size + ug * size + lb) * 3 + l] * 65535)) + (fB - fR) * (int_round((float)to_shrink[(lr * size * size + ug * size + ub) * 3 + l] * 65535)) + fR * (int_round((float)to_shrink[(ur * size * size + ug * size + ub) * 3 + l] * 65535)));
+						shrinked[idx + l] = 0.5 + (float)((1 - fG) * (int_round((float)to_shrink[(lr * size2 + lg * size + lb) * 3 + l] * 65535)) + (fG - fB) * (int_round((float)to_shrink[(lr * size2 + ug * size + lb) * 3 + l] * 65535)) + (fB - fR) * (int_round((float)to_shrink[(lr * size2 + ug * size + ub) * 3 + l] * 65535)) + fR * (int_round((float)to_shrink[(ur * size2 + ug * size + ub) * 3 + l] * 65535)));
 
 				else if (fB > fR && fR > fG)
 					for (uint32 l = 0; l < 3; ++l)
-						shrinked[idx + l] = 0.5 + (float)((1 - fB) * (int_round((float)to_shrink[(lr * size * size + lg * size + lb) * 3 + l] * 65535)) + (fB - fR) * (int_round((float)to_shrink[(lr * size * size + lg * size + ub) * 3 + l] * 65535)) + (fR - fG) * (int_round((float)to_shrink[(ur * size * size + lg * size + ub) * 3 + l] * 65535)) + fG * (int_round((float)to_shrink[(ur * size * size + ug * size + ub) * 3 + l] * 65535)));
+						shrinked[idx + l] = 0.5 + (float)((1 - fB) * (int_round((float)to_shrink[(lr * size2 + lg * size + lb) * 3 + l] * 65535)) + (fB - fR) * (int_round((float)to_shrink[(lr * size2 + lg * size + ub) * 3 + l] * 65535)) + (fR - fG) * (int_round((float)to_shrink[(ur * size2 + lg * size + ub) * 3 + l] * 65535)) + fG * (int_round((float)to_shrink[(ur * size2 + ug * size + ub) * 3 + l] * 65535)));
 
 				else if (fB > fG && fG >= fR)
 					for (uint32 l = 0; l < 3; ++l)
-						shrinked[idx + l] = 0.5 + (float)((1 - fB) * (int_round((float)to_shrink[(lr * size * size + lg * size + lb) * 3 + l] * 65535)) + (fB - fG) * (int_round((float)to_shrink[(lr * size * size + lg * size + ub) * 3 + l] * 65535)) + (fG - fR) * (int_round((float)to_shrink[(lr * size * size + ug * size + ub) * 3 + l] * 65535)) + fR * (int_round((float)to_shrink[(ur * size * size + ug * size + ub) * 3 + l] * 65535)));
+						shrinked[idx + l] = 0.5 + (float)((1 - fB) * (int_round((float)to_shrink[(lr * size2 + lg * size + lb) * 3 + l] * 65535)) + (fB - fG) * (int_round((float)to_shrink[(lr * size2 + lg * size + ub) * 3 + l] * 65535)) + (fG - fR) * (int_round((float)to_shrink[(lr * size2 + ug * size + ub) * 3 + l] * 65535)) + fR * (int_round((float)to_shrink[(ur * size2 + ug * size + ub) * 3 + l] * 65535)));
 
 				else if (fR >= fG && fG > fB)
 					for (uint32 l = 0; l < 3; ++l)
-						shrinked[idx + l] = 0.5 + (float)((1 - fR) * (int_round((float)to_shrink[(lr * size * size + lg * size + lb) * 3 + l] * 65535)) + (fR - fG) * (int_round((float)to_shrink[(ur * size * size + lg * size + lb) * 3 + l] * 65535)) + (fG - fB) * (int_round((float)to_shrink[(ur * size * size + ug * size + lb) * 3 + l] * 65535)) + fB * (int_round((float)to_shrink[(ur * size * size + ug * size + ub) * 3 + l] * 65535)));
+						shrinked[idx + l] = 0.5 + (float)((1 - fR) * (int_round((float)to_shrink[(lr * size2 + lg * size + lb) * 3 + l] * 65535)) + (fR - fG) * (int_round((float)to_shrink[(ur * size2 + lg * size + lb) * 3 + l] * 65535)) + (fG - fB) * (int_round((float)to_shrink[(ur * size2 + ug * size + lb) * 3 + l] * 65535)) + fB * (int_round((float)to_shrink[(ur * size2 + ug * size + ub) * 3 + l] * 65535)));
 
 				else if (fG > fR && fR >= fB)
 					for (uint32 l = 0; l < 3; ++l)
-						shrinked[idx + l] = 0.5 + (float)((1 - fG) * (int_round((float)to_shrink[(lr * size * size + lg * size + lb) * 3 + l] * 65535)) + (fG - fR) * (int_round((float)to_shrink[(lr * size * size + ug * size + lb) * 3 + l] * 65535)) + (fR - fB) * (int_round((float)to_shrink[(ur * size * size + ug * size + lb) * 3 + l] * 65535)) + fB * (int_round((float)to_shrink[(ur * size * size + ug * size + ub) * 3 + l] * 65535)));
+						shrinked[idx + l] = 0.5 + (float)((1 - fG) * (int_round((float)to_shrink[(lr * size2 + lg * size + lb) * 3 + l] * 65535)) + (fG - fR) * (int_round((float)to_shrink[(lr * size2 + ug * size + lb) * 3 + l] * 65535)) + (fR - fB) * (int_round((float)to_shrink[(ur * size2 + ug * size + lb) * 3 + l] * 65535)) + fB * (int_round((float)to_shrink[(ur * size2 + ug * size + ub) * 3 + l] * 65535)));
 
 				else if (fR >= fB && fB >= fG)
 					for (uint32 l = 0; l < 3; ++l)
-						shrinked[idx + l] = 0.5 + (float)((1 - fR) * (int_round((float)to_shrink[(lr * size * size + lg * size + lb) * 3 + l] * 65535)) + (fR - fB) * (int_round((float)to_shrink[(ur * size * size + lg * size + lb) * 3 + l] * 65535)) + (fB - fG) * (int_round((float)to_shrink[(ur * size * size + lg * size + ub) * 3 + l] * 65535)) + fG * (int_round((float)to_shrink[(ur * size * size + ug * size + ub) * 3 + l] * 65535)));
+						shrinked[idx + l] = 0.5 + (float)((1 - fR) * (int_round((float)to_shrink[(lr * size2 + lg * size + lb) * 3 + l] * 65535)) + (fR - fB) * (int_round((float)to_shrink[(ur * size2 + lg * size + lb) * 3 + l] * 65535)) + (fB - fG) * (int_round((float)to_shrink[(ur * size2 + lg * size + ub) * 3 + l] * 65535)) + fG * (int_round((float)to_shrink[(ur * size2 + ug * size + ub) * 3 + l] * 65535)));
 			}
 }
 
@@ -330,7 +330,7 @@ bool encode(string path, string outFileName)
 		uint8 *dPtr_1 = new uint8[safeCompressedSize + 4];
 		memcpy(dPtr_1, &uncompressedSize_1, 4);
 		uLongf dCount = safeCompressedSize;
-		int32 zResult_1 = compress2(dPtr_1 + 4, &dCount, block1_1, uncompressedSize_1, Z_DEFAULT_COMPRESSION);
+		compress2(dPtr_1 + 4, &dCount, block1_1, uncompressedSize_1, Z_DEFAULT_COMPRESSION);
 		// printf("%s %d\n","zResult_1:",zResult_1);
 		delete[] samples_2;
 		uint32 compressedSize_1 = (uint32)dCount + 4;
@@ -344,7 +344,7 @@ bool encode(string path, string outFileName)
 		// printf("%s %d\n","compressedSize_1:",compressedSize_1);
 		uLongf destLen_1 = uncompressedSize_1;
 		uint8 *block3_1 = new uint8[uncompressedSize_1];
-		int32 zResult_2 = uncompress(block3_1, &destLen_1, dPtr_1 + 4, compressedSize_1 - 4);
+		uncompress(block3_1, &destLen_1, dPtr_1 + 4, compressedSize_1 - 4);
 		// printf("%s %d\n","zResult_2:",zResult_2);
 #ifdef DEBUG
 		FILE *f_2 = fopen("outputencoded_1.txt", "wb");
@@ -489,7 +489,7 @@ bool decode(string path, string outFileName)
 
 		uint8 *block3 = new uint8[uncompressedSize];
 		uLongf destLen = uncompressedSize;
-		int32 zResult = uncompress(block3, &destLen, dPtr + 4, compressedSize - 4);
+		uncompress(block3, &destLen, dPtr + 4, compressedSize - 4);
 		// printf("\n%s %d\n","zResult:",zResult);
 		delete[] dPtr;
 #ifdef DEBUG

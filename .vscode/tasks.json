@@ -14,13 +14,13 @@
             "label": "emscripten",
             "type": "shell",
             "command": "em++",
-            "args": [				
+            "args": [	
+				"sources/lightMD5.cpp",			
                 "sources/xmp_webconverter.cpp",
 				"-std=c++2a",
 				"-sALLOW_MEMORY_GROWTH=1",
 				"-lzlib",
 				"-lworkerfs.js",
-				"-llightmd5",
 				"-lminizip",
 				"--bind",
 				//"--closure=1",

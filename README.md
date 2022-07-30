@@ -8,7 +8,7 @@ There are some little differences:
 3) Emscripten 
  - it doesn't use int main() so I've removed getopt/optparse 
  - parallel mode isn't supported by WASM
- - I've added minizip-ng(https://github.com/zlib-ng/minizip-ng), automatic zip all converted files, you will find an already compiled static lib inside emsdk folder, just copy and paste (when building from source I've used only the following options on CMAKE in order to reduce weight of lib and complexity: MZ_ZLIB=ON,MZ_COMPRESS_ONLY=ON,MZ_PKCRYPT=ON,C_FLAGS="-Os").
+ - I've added minizip-ng(https://github.com/zlib-ng/minizip-ng), automatic zip all converted files, you will find an already compiled static lib inside emsdk folder, just copy and paste (when building from source I've used only the following options on CMAKE in order to reduce weight of lib and complexity: emcmake cmake -S .. -DMZ_LZMA=OFF -DMZ_BZIP2=OFF -DMZ_FETCH_LIBS=OFF -DMZ_ZSTD=OFF -DMZ_ZLIB=ON -DMZ_COMPRESS_ONLY=ON -DMZ_PKCRYPT=ON -DMZ_ICONV=OFF -DMZ_COMPAT=OFF -DCMAKE_C_FLAGS="-O3 -DNDEBUG").
 
 For emscripten version, I've exported 3 functions: options, encode and decode:  
 options( {input,output,title,size,min,max,group,primaries,size,strength,gamut,} )  

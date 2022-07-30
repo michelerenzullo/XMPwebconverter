@@ -1,5 +1,5 @@
-emsdk v3.1.13 includes already compiled zlib v1.2.12.1, light-md5(https://github.com/michelerenzullo/light-md5) and minizip-ng v3.0.6.
+emsdk v3.1.14 includes already compiled zlib v1.2.12.1, light-md5(https://github.com/michelerenzullo/light-md5) and minizip-ng v3.0.6.
 I've made a little patch on embind.js in order to allow "optionals" arguments for options_setter function, if you use a new version of emsdk please build again libs.
 
 
-em++ xmp_webconverter.cpp -lzlib -lworkerfs.js --bind -s ALLOW_MEMORY_GROWTH=1 -std=c++2a -o xmp_webconverter.js -llightmd5 -lminizip -O3
+em++ lightMD5.cpp xmp_webconverter.cpp -lzlib -lworkerfs.js --bind -s ALLOW_MEMORY_GROWTH=1 -std=c++2a -o xmp_webconverter.js -lminizip -O3
