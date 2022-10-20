@@ -84,7 +84,7 @@ int32_t CUBEParser(char* const file, int32_t mode, char* title, int32_t* size, d
 			*size = input_size;
 
 			char* search_start = text_;
-			while (*search_start) if (*search_start++ == '\n' && *search_start <= '9' && *search_start >= '0') break;
+			while (*search_start) if (*search_start++ == '\n' && (*search_start == '-' || (*search_start <= '9' && *search_start >= '0'))) break;
 			if (*search_start) {
 
 				double* samples = (double*)malloc(sizeof(double) * (size_t)pow(input_size, 3) * 3);

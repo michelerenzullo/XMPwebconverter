@@ -1,20 +1,10 @@
-{"version": "2.0.0",/*
-    "windows": {
-        "options": {
-            "shell": {
-                "executable": "cmd.exe",
-                "args": [
-                    "/d", "/c"
-                ]
-            }
-        }
-    },*/
+{"version": "2.0.0",
     "tasks": [
         {
-            "label": "emscripten",
-            "type": "shell",
-            "command": "em++",
-            "args": [	
+			"type": "cppbuild",
+			"label": "standard",
+			"command": "em++",
+			"args": [	
 				"sources/lightMD5.cpp",			
                 "sources/xmp_webconverter.cpp",
 				"-std=c++2a",

@@ -28,7 +28,7 @@ void shrink(double *to_shrink, uint16 *shrinked, int32 size, int32 new_size)
 	I've made some casts in order to produce exactly the same values of Camera Raw, note, few times when ratio have many decimals(like size 36 --> 28)
 	could be differ of (1/65535)*255 due to math of compiler, obv is so little that doesn't affect quality(or similarity with Lightroom) */
 
-	double ratio = (size - 1.0) / (new_size - 1.0);
+	const double ratio = (size - 1.0) / (new_size - 1.0);
 	const int32 size2 = size * size;
 	for (int32 i = 0, idx; i < new_size; ++i)
 		for (int32 j = 0; j < new_size; ++j)
@@ -407,6 +407,8 @@ bool encode(string path, string outFileName)
 	return result;
 }
 
+constexpr float INV_65535 = 1 / 65535.f;
+
 bool decode(string path, string outFileName)
 {
 	uint32 compressedSize = 0;
@@ -547,9 +549,9 @@ bool decode(string path, string outFileName)
 					{
 						idx = 8 + (rIndex + gIndex * fDivisions + bIndex * fDivisions * fDivisions) * 3;
 						fprintf(f_4, "%.9f %.9f %.9f\n",
-								(uint16)(*(block3_ + idx + 0) + nopValue[bIndex]) / 65535.0f,
-								(uint16)(*(block3_ + idx + 1) + nopValue[gIndex]) / 65535.0f,
-								(uint16)(*(block3_ + idx + 2) + nopValue[rIndex]) / 65535.0f);
+								(uint16)(block3_[idx + 0] + nopValue[bIndex]) * INV_65535,
+								(uint16)(block3_[idx + 1] + nopValue[gIndex]) * INV_65535,
+								(uint16)(block3_[idx + 2] + nopValue[rIndex]) * INV_65535);
 					}
 			fclose(f_4);
 		}
