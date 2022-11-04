@@ -21,7 +21,8 @@
    -3 if the input file hasn't been found
 
 	In the source code remember to free memory of data table after usage, if
-	buffer is passed as argument is free internally.
+	buffer is passed as argument it will be modified and remember that
+	it has to be free.
 
 	Written by Michele Renzullo
 */
@@ -121,7 +122,7 @@ int32_t CUBEParser(char* const file, int32_t mode, char* title, int32_t* size, d
 		}
 		else result = -2;
 
-		free(text_);
+		if (mode) free(text_); //free mem only if it has been allocated internally
 	}
 
 	else result = -3;

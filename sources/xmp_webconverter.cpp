@@ -17,6 +17,11 @@ typedef uint8_t uint8;
 typedef uint16_t uint16;
 typedef uint32_t uint32;
 
+struct free_delete
+{
+	void operator()(void *ptr) const { free(ptr); }
+};
+
 string md5_process(uint8 *, size_t);
 
 int32 int_round(double n) { return n >= 0 ? (int32)(n + .5) : (int32)(n - .5); }
@@ -180,8 +185,9 @@ bool encode(string path, string outFileName)
 {
 	char title[100] = {0};
 	int32_t input_size;
-	double *samples_1 = NULL;
-	int32_t result = CUBEParser(path.data(), 1, title, &input_size, &samples_1);
+	double *samples_1_rawptr = nullptr;
+	int32_t result = CUBEParser(path.data(), 1, title, &input_size, &samples_1_rawptr);
+	auto samples_1 = std::unique_ptr<double[], free_delete>(samples_1_rawptr);
 
 	switch (result)
 	{
@@ -198,14 +204,14 @@ bool encode(string path, string outFileName)
 
 		uint32 size = (input_size > options.size) ? options.size : input_size;
 		// if(input_size>32) printf("ACR unsupports LUT>32, resampling enabled\n");
-		uint16 *nopValue_1 = new uint16[size];
+		auto nopValue_1 = std::make_unique<uint16[]>(size);
 		for (uint32 index = 0; index < size; index++)
 			nopValue_1[index] = (index * 0x0FFFF + (size >> 1)) / (size - 1);
 		uint32 padding = 16 + size * size * size * 3 * 2 + 28;
-		uint8 *samples_2 = new uint8[padding];
+		auto samples_2 = std::make_unique<uint8[]>(padding);
 
 		uint32 header[4] = {1, 1, 3, size};
-		memcpy(samples_2, header, 16);
+		memcpy(samples_2.get(), header, 16);
 		uint32 colors = 0, gamma = 1; // default sRGB
 		if (options.primaries == "Adobe")
 		{
@@ -231,15 +237,14 @@ bool encode(string path, string outFileName)
 		uint32 gamut = (options.gamut == "extend");
 
 		uint32 footer[3] = {colors, gamma, gamut};
-		memcpy(samples_2 + 16 + size * size * size * 3 * 2, footer, 12);
+		memcpy(&samples_2[16 + size * size * size * 3 * 2], footer, 12);
 		double range[2] = {options.min * 0.01, options.max * 0.01};
-		memcpy(samples_2 + 16 + size * size * size * 3 * 2 + 12, range, 16);
+		memcpy(&samples_2[16 + size * size * size * 3 * 2 + 12], range, 16);
 
 		if (input_size != size)
 		{
-			uint16 *shrinked = new uint16[size * size * size * 3];
-			shrink(samples_1, shrinked, input_size, size);
-			free(samples_1);
+			auto shrinked = std::make_unique<uint16[]>(size * size * size * 3);
+			shrink(samples_1.get(), shrinked.get(), input_size, size);
 
 			for (uint32 bIndex = 0, idx, j = 0; bIndex < size; ++bIndex)
 				for (uint32 gIndex = 0; gIndex < size; ++gIndex)
@@ -248,15 +253,14 @@ bool encode(string path, string outFileName)
 						idx = 16 + (rIndex * size * size + gIndex * size + bIndex) * 3 * 2;
 
 						uint16 temp = shrinked[j] - nopValue_1[rIndex];
-						memcpy(samples_2 + idx, &temp, 2);
+						memcpy(&samples_2[idx], &temp, 2);
 
 						temp = shrinked[j + 1] - nopValue_1[gIndex];
-						memcpy(samples_2 + idx + 2, &temp, 2);
+						memcpy(&samples_2[idx + 2], &temp, 2);
 
 						temp = shrinked[j + 2] - nopValue_1[bIndex];
-						memcpy(samples_2 + idx + 4, &temp, 2);
+						memcpy(&samples_2[idx + 4], &temp, 2);
 					}
-			delete[] shrinked;
 		}
 		else
 		{
@@ -267,17 +271,15 @@ bool encode(string path, string outFileName)
 						idx = 16 + (rIndex * size * size + gIndex * size + bIndex) * 3 * 2;
 
 						uint16 temp = (int_round(samples_1[j] * 65535)) - nopValue_1[rIndex];
-						memcpy(samples_2 + idx, &temp, 2);
+						memcpy(&samples_2[idx], &temp, 2);
 
 						temp = (int_round(samples_1[j + 1] * 65535)) - nopValue_1[gIndex];
-						memcpy(samples_2 + idx + 2, &temp, 2);
+						memcpy(&samples_2[idx + 2], &temp, 2);
 
 						temp = (int_round(samples_1[j + 2] * 65535)) - nopValue_1[bIndex];
-						memcpy(samples_2 + idx + 4, &temp, 2);
+						memcpy(&samples_2[idx + 4], &temp, 2);
 					}
-			free(samples_1);
 		}
-		delete[] nopValue_1;
 
 		// printf("tot: %d\n",padding);
 #ifdef DEBUG
@@ -316,23 +318,22 @@ bool encode(string path, string outFileName)
 		fclose(f_5);
 #endif
 
-		uint8 *block1_1 = samples_2;
+		auto block1_1 = std::move(samples_2);
 		uint32 uncompressedSize_1 = padding;
 		uint32 safeCompressedSize = (uncompressedSize_1 | uncompressedSize_1 >> 8) + 64;
 		// printf("\n%s %d \n%s %d\n","uncompressedSize_1:",uncompressedSize_1,"safeCompressedSize:",safeCompressedSize);
 
-		string MD5 = md5_process(block1_1, uncompressedSize_1);
+		string MD5 = md5_process(block1_1.get(), uncompressedSize_1);
 		// printf("MD5: %s\n", MD5.c_str());
 		string UUID = MD5 + std::to_string(time_t(time(NULL)));
 		UUID = md5_process((uint8 *)UUID.c_str(), UUID.length());
 		// printf("UUID(aka MD5 of MD5+TIME): %s\n",UUID.c_str());
 
-		uint8 *dPtr_1 = new uint8[safeCompressedSize + 4];
-		memcpy(dPtr_1, &uncompressedSize_1, 4);
+		auto dPtr_1 = std::make_unique<uint8[]>(safeCompressedSize + 4);
+		memcpy(dPtr_1.get(), &uncompressedSize_1, 4);
 		uLongf dCount = safeCompressedSize;
-		compress2(dPtr_1 + 4, &dCount, block1_1, uncompressedSize_1, Z_DEFAULT_COMPRESSION);
+		compress2(&dPtr_1[4], &dCount, block1_1.get(), uncompressedSize_1, Z_DEFAULT_COMPRESSION);
 		// printf("%s %d\n","zResult_1:",zResult_1);
-		delete[] samples_2;
 		uint32 compressedSize_1 = (uint32)dCount + 4;
 #ifdef DEBUG
 		FILE *f_1 = fopen("outputencoded.txt", "wb");
@@ -343,8 +344,8 @@ bool encode(string path, string outFileName)
 
 		// printf("%s %d\n","compressedSize_1:",compressedSize_1);
 		uLongf destLen_1 = uncompressedSize_1;
-		uint8 *block3_1 = new uint8[uncompressedSize_1];
-		uncompress(block3_1, &destLen_1, dPtr_1 + 4, compressedSize_1 - 4);
+		auto block3_1 = std::make_unique<uint8[]>(uncompressedSize_1);
+		uncompress(block3_1.get(), &destLen_1, &dPtr_1[4], compressedSize_1 - 4);
 		// printf("%s %d\n","zResult_2:",zResult_2);
 #ifdef DEBUG
 		FILE *f_2 = fopen("outputencoded_1.txt", "wb");
@@ -352,19 +353,18 @@ bool encode(string path, string outFileName)
 			fputs((std::to_string(block3_1[i]) + " ").c_str(), f_2);
 		fclose(f_2);
 #endif
-		delete[] block3_1;
 
 		static const char *kEncodeTable = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.-:+=^!/*?`'|()[]{}@%$#";
 		uint32 safeEncodedSize = compressedSize_1 + (compressedSize_1 >> 2) + (compressedSize_1 >> 6) + 16;
 
-		uint8 *sPtr_1 = dPtr_1;
+		auto sPtr_1 = std::move(dPtr_1);
 		sPtr_1[compressedSize_1] = 0;
 		sPtr_1[compressedSize_1 + 1] = 0;
 		sPtr_1[compressedSize_1 + 2] = 0;
-		uint8 *dPtr_2 = new uint8[safeEncodedSize];
+		auto dPtr_2 = std::make_unique<uint8[]>(safeEncodedSize);
 		uint32 k = 0;
 
-		const uint32 *sPtr_1_ = reinterpret_cast<const uint32 *>(sPtr_1);
+		const uint32 *sPtr_1_ = reinterpret_cast<const uint32 *>(sPtr_1.get());
 		for (uint32 i = 0, x; compressedSize_1; ++i)
 		{
 			x = *(sPtr_1_ + i);
@@ -375,14 +375,13 @@ bool encode(string path, string outFileName)
 					break;
 			}
 		}
-		delete[] dPtr_1;
 
 		FILE *f_6 = fopen(outFileName.c_str(), "wb");
 		if (f_6)
 		{
 			string assembled = xmp_container[0] + UUID + xmp_container[1] + options.strength + xmp_container[2] + MD5 + xmp_container[3] + MD5 + xmp_container[4];
 			fwrite(assembled.c_str(), 1, assembled.size(), f_6);
-			fwrite(dPtr_2, 1, k, f_6);
+			fwrite(dPtr_2.get(), 1, k, f_6);
 			if (options.amount > 0 && options.amount <= 200 && options.amount != 100)
 			{
 				string val = std::to_string(options.amount * 0.01);
@@ -398,7 +397,6 @@ bool encode(string path, string outFileName)
 		}
 		else
 			printf("Error writing file\n");
-		delete[] dPtr_2;
 		// printf("%s %d\n%s %d\n","safeEncodedSize:",safeEncodedSize,"true EncodedSize:",k);
 		result = 1;
 		break;
@@ -412,7 +410,7 @@ constexpr float INV_65535 = 1 / 65535.f;
 bool decode(string path, string outFileName)
 {
 	uint32 compressedSize = 0;
-	string block1 = (get_file_contents(path));
+	string block1 = get_file_contents(path);
 	size_t found = block1.find("Name>\n    <rdf:Alt>\n     <rdf:li xml:lang=\"x-default\">") + 54;
 	// if (found==53) found = block1.find("Name>\r\n    <rdf:Alt>\r\n     <rdf:li xml:lang=\"x-default\">")+56;
 	string title = block1.substr(found, block1.find("</", found) - found);
@@ -425,7 +423,7 @@ bool decode(string path, string outFileName)
 		uint32 encodedSize = (uint32)block1.length();
 
 		uint32 maxCompressedSize = (encodedSize + 4) / 5 * 4;
-		uint8 *dPtr = new uint8[maxCompressedSize];
+		auto dPtr = std::make_unique<uint8[]>(maxCompressedSize);
 		// printf("- test decoding -\n%s %d\n","maxCompressedSize:",maxCompressedSize);
 
 		static const uint8 kDecodeTable[96] = {0xFF, 0x44, 0xFF, 0x54, 0x53, 0x52, 0xFF, 0x49, 0x4B, 0x4C, 0x46, 0x41, 0xFF, 0x3F, 0x3E, 0x45, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x40, 0xFF, 0xFF, 0x42, 0xFF, 0x47, 0x51, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2A, 0x2B, 0x2C, 0x2D, 0x2E, 0x2F, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3A, 0x3B, 0x3C, 0x3D, 0x4D, 0xFF, 0x4E, 0x43, 0xFF, 0x48, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F, 0x20, 0x21, 0x22, 0x23, 0x4F, 0x4A, 0x50, 0xFF, 0xFF};
@@ -457,7 +455,7 @@ bool decode(string path, string outFileName)
 				break;
 			case 5:
 				value += d * (85 * 85 * 85 * 85);
-				memcpy(dPtr + compressedSize, &value, 4);
+				memcpy(&dPtr[compressedSize], &value, 4);
 				compressedSize += 4;
 				phase = 0;
 				break;
@@ -479,7 +477,7 @@ bool decode(string path, string outFileName)
 			compressedSize++;
 		}
 
-		uint32 uncompressedSize = *(reinterpret_cast<uint32 *>(dPtr));
+		uint32 uncompressedSize = *(reinterpret_cast<uint32 *>(dPtr.get()));
 
 		// printf("\n%s %d\n%s %d\n%s %d\n%s %d\n", "encodedSize:", encodedSize, "compressedSize:", compressedSize, "uncompressedSize:", uncompressedSize, "compressedSize-4:", compressedSize-4);
 #ifdef DEBUG
@@ -489,11 +487,10 @@ bool decode(string path, string outFileName)
 		fclose(f);
 #endif
 
-		uint8 *block3 = new uint8[uncompressedSize];
+		auto block3 = std::make_unique<uint8[]>(uncompressedSize);
 		uLongf destLen = uncompressedSize;
-		uncompress(block3, &destLen, dPtr + 4, compressedSize - 4);
+		uncompress(block3.get(), &destLen, &dPtr[4], compressedSize - 4);
 		// printf("\n%s %d\n","zResult:",zResult);
-		delete[] dPtr;
 #ifdef DEBUG
 		FILE *f_3 = fopen("final.txt", "wb");
 		for (uint32 i = 0, j = 0, k = 0; i < uncompressedSize; ++i)
@@ -533,7 +530,7 @@ bool decode(string path, string outFileName)
 		// printf("MD5: %s\n", md5_process(block3,uncompressedSize).c_str());
 
 		const uint8 fDivisions = block3[12];
-		uint16 *nopValue = new uint16[fDivisions];
+		auto nopValue = std::make_unique<uint16[]>(fDivisions);
 		for (uint32 index = 0; index < fDivisions; index++)
 			nopValue[index] = (index * 0x0FFFF + (fDivisions >> 1)) / (fDivisions - 1);
 
@@ -542,7 +539,7 @@ bool decode(string path, string outFileName)
 		{
 			fprintf(f_4, "TITLE \"%s\"\nDOMAIN_MIN 0 0 0\nDOMAIN_MAX 1 1 1\nLUT_3D_SIZE %d\n", title.c_str(), fDivisions);
 
-			const uint16 *block3_ = reinterpret_cast<const uint16 *>(block3);
+			const uint16 *block3_ = reinterpret_cast<const uint16 *>(block3.get());
 			for (uint32 rIndex = 0, idx; rIndex < fDivisions; ++rIndex)
 				for (uint32 gIndex = 0; gIndex < fDivisions; ++gIndex)
 					for (uint32 bIndex = 0; bIndex < fDivisions; ++bIndex)
@@ -557,8 +554,6 @@ bool decode(string path, string outFileName)
 		}
 		else
 			printf("Error writing file\n");
-		delete[] nopValue;
-		delete[] block3;
 		return 1;
 	}
 	else
