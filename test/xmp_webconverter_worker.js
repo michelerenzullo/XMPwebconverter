@@ -1,8 +1,16 @@
-onmessage = (e) => {
+const waitFor = condition => {
+	// recursively set a timeout till condition has been satisfied
+	const poll = resolve => condition() ? resolve() : setTimeout(() => poll(resolve), 5)
+	return new Promise(poll)
+}
+
+onmessage = async e => {
 	const files = e.data[0];
 	const args = e.data[1];
 	args["input"] = "to_convert/"
 	args["output"] = "converted/"
+
+	await waitFor(() => runtimeInitialized === true);
 
 	/* if (!Object.keys(FS.open('/','r').node.contents).includes(args.input.endsWith("/") ? args.input.slice(0,-1) : args.input))
 		FS.mkdir(args.input);*/
